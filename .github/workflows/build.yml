@@ -9,6 +9,8 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: 
+  contents: write
 
 jobs:
   bakeHTML:
