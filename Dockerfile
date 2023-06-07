@@ -26,6 +26,9 @@ RUN apt-get install librtlsdr0 libairspy0 libhackrf0 libairspyhf1 libzmq5 libsox
 COPY --from=build /usr/local/bin/AIS-catcher /usr/local/bin/AIS-catcher
 COPY --from=build /root/AIS-catcher /root/AIS-catcherr
 
-RUN su postgres; createdb ais; exit; cd /root/AIS-catcher; psql ais <DBMS/create.sql
-
 ENTRYPOINT ["/usr/local/bin/AIS-catcher"]
+
+RUN sudo -u postgres createdb ais
+RUN psql ais <DBMS/create.sql
+
+#RUN su postgres; createdb ais; exit; cd /root/AIS-catcher; psql ais <DBMS/create.sql
