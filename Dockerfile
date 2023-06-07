@@ -27,7 +27,8 @@ COPY --from=build /usr/local/bin/AIS-catcher /usr/local/bin/AIS-catcher
 
 ENTRYPOINT ["/usr/local/bin/AIS-catcher"]
 
-RUN sudo -u postgres createdb ais
+#RUN sudo -u postgres createdb ais
+RUN postgres createdb ais
 RUN psql ais <DBMS/create.sql
 
 #RUN su postgres; createdb ais; exit; cd /root/AIS-catcher; psql ais <DBMS/create.sql
