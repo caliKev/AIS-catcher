@@ -98,7 +98,7 @@ namespace AIS {
 		DSP::Upsample US;
 		DSP::FilterCIC5 FCIC5_a, FCIC5_b;
 		DSP::FilterComplex3Tap FDC;
-
+		DSP::DownsampleMovingAverage DS_MA;
 		// fixed point downsamplers
 		DSP::Downsample16_CU8 DS16_CU8;
 
@@ -109,6 +109,7 @@ namespace AIS {
 		bool droop_compensation = true;
 		bool SOXR_DS = false;
 		bool SAMPLERATE_DS = false;
+		bool MA_DS = false;
 
 		const int nSymbolsPerSample = 48000 / 9600;
 
@@ -184,6 +185,7 @@ namespace AIS {
 		int nDelay = 3;
 
 		bool PS_EMA = true;
+		bool CGF_wide = false;
 
 	public:
 		void buildModel(char, char, int, bool, Device::Device*);

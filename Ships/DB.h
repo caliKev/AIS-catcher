@@ -45,12 +45,16 @@ const int IMO_UNDEFINED = 0;
 const int ANGLE_UNDEFINED = -1;
 
 class DB : public StreamIn<JSON::JSON>, public StreamIn<AIS::GPS>, public StreamOut<JSON::JSON> {
+
+	JSON::StringBuilder builder;
+
 	int first, last, count, path_idx = 0;
 	std::string content, delim;
-	float lat, lon;
+	float lat = LAT_UNDEFINED, lon = LON_UNDEFINED;
 	int TIME_HISTORY = 30 * 60;
 	bool latlon_share = false;
 	bool server_mode = false;
+	bool msg_save = false;
 
 	int N = 4096;
 	int M = 4096;
@@ -85,6 +89,7 @@ class DB : public StreamIn<JSON::JSON>, public StreamIn<AIS::GPS>, public Stream
 		std::time_t last_signal;
 		bool approximate = false;
 		char shipname[21] = { 0 }, destination[21] = { 0 }, callsign[8] = { 0 }, country_code[3] = { 0 };
+		std::string *msg = NULL;
 	};
 
 	struct PathList {
@@ -130,6 +135,9 @@ class DB : public StreamIn<JSON::JSON>, public StreamIn<AIS::GPS>, public Stream
 	void getDistanceAndBearing(float lat1, float lon1, float lat2, float lon2, float& distance, int& bearing);
 
 public:
+
+	DB() : builder(&AIS::KeyMap, JSON_DICT_FULL) {}
+
 	void setup(float lat = 0.0f, float lon = 0.0f);
 	void setTimeHistory(int t) { TIME_HISTORY = t; }
 	void setShareLatLon(bool b) { latlon_share = b; }
@@ -140,11 +148,16 @@ public:
 		lon = data[0].lon;
 	}
 
+	void getShipJSON(const VesselDetail& ship, std::string& content, long int now);
+	std::string getShipJSON(int mmsi);
 	std::string getJSON(bool full = false);
+	std::string getJSONcompact(bool full = false);
 	std::string getPathJSON(uint32_t);
+	std::string getMessage(uint32_t);
 
 	int getCount() { return count; }
 	int getMaxCount() { return N; }
 
 	void setServerMode(bool b) { server_mode = b; }
+	void setMsgSave(bool b) { msg_save = b; }
 };

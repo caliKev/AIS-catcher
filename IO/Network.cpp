@@ -352,6 +352,24 @@ namespace IO {
 	}
 
 	void UDP::Receive(const AIS::Message* data, int len, TAG& tag) {
+		if(reset > 0) {
+			long now = (long) std::time(nullptr);
+			if ((now - last_reconnect) > 60*reset) {
+
+				std::cerr << "UDP: recreate socket (" << host << ":" << port << ")" << std::endl;
+
+				closesocket(sock);
+				sock = socket(address->ai_family, address->ai_socktype, address->ai_protocol);
+
+				if (sock == -1) {
+					std::cerr << "UDP: cannot create socket. Requesting termination.\n";
+					StopRequest();
+				}
+
+				last_reconnect = now;
+			}
+		}
+		
 		if (sock != -1) {
 			if (!JSON) {
 				for (int i = 0; i < len; i++) {
@@ -389,7 +407,9 @@ namespace IO {
 	void UDP::Start() {
 		std::cerr << "UDP: open socket for host: " << host << ", port: " << port << ", filter: " << Util::Convert::toString(filter.isOn());
 		if (filter.isOn()) std::cerr << ", allowed: {" << filter.getAllowed() << "}";
-		std::cerr << ", JSON: " << Util::Convert::toString(JSON) << std::endl;
+		std::cerr << ", JSON: " << Util::Convert::toString(JSON);
+		if(reset > 0) std::cerr << ", reset: " << reset;
+		std::cerr << std::endl;
 
 		if (sock != -1) {
 			throw std::runtime_error("UDP: internal error, socket already defined.");
@@ -416,13 +436,21 @@ namespace IO {
 		if (sock == -1) {
 			throw std::runtime_error("cannot create socket for UDP " + host + " port " + port);
 		}
+		if(reset > 0)
+			last_reconnect = (long) std::time(nullptr);
 	}
 
 	void UDP::Stop() {
+		std::cerr << "UDP: close socket for host: " << host << ", port: " << port << std::endl;
+
 		if (sock != -1) {
 			closesocket(sock);
 			sock = -1;
 		}
+		if (address != NULL) {
+			freeaddrinfo(address);
+			address = NULL;
+    	}
 	}
 
 	Setting& UDP::Set(std::string option, std::string arg) {
@@ -437,8 +465,8 @@ namespace IO {
 		else if (option == "JSON") {
 			JSON = Util::Parse::Switch(arg);
 		}
-		else if (option == "RECONNECT") {
-			reconnect = Util::Parse::Switch(arg);
+		else if (option == "RESET") {
+			reset = Util::Parse::Integer(arg,1,24*60);
 		}
 		else
 			return filter.Set(option, arg);
@@ -454,8 +482,13 @@ namespace IO {
 			for (int i = 0; i < len; i++) {
 				if (!filter.include(data[i])) continue;
 
-				for (const auto& s : data[i].NMEA)
-					SendTo((s + "\r\n").c_str());
+				for (const auto& s : data[i].NMEA) {
+					if (SendTo((s + "\r\n").c_str()) < 0)
+						if (!persistent) {
+							std::cerr << "TCP feed: requesting termination.\n";
+							StopRequest();
+						}
+				}
 			}
 		}
 		else {
@@ -477,19 +510,26 @@ namespace IO {
 
 				for (int j = 1; j < data[i].NMEA.size(); j++) str += ",\"" + data[i].NMEA[j] + "\"";
 				str += "]}\r\n";
-				SendTo(str);
+
+				if(SendTo(str) <0) 
+					if (!persistent) {
+						std::cerr << "TCP feed: requesting termination.\n";
+						StopRequest();
+					}
 			}
 		}
 	}
 
 	void TCP::Start() {
-		std::cerr << "TCP: open socket for host: " << host << ", port: " << port << ", filter: " << Util::Convert::toString(filter.isOn());
+		std::cerr << "TCP feed: open socket for host: " << host << ", port: " << port << ", filter: " << Util::Convert::toString(filter.isOn());
 		if (filter.isOn()) std::cerr << ", allowed: {" << filter.getAllowed() << "}";
-		std::cerr << ", JSON: " << Util::Convert::toString(JSON) << std::endl;
+		std::cerr << ", PERSIST: " << Util::Convert::toString(persistent);
+		std::cerr << ", JSON: " << Util::Convert::toString(JSON) << ", status: ";
 
-		if (!tcp.connect(host, port)) {
-			std::cerr << "Cannot set up initial connect to TCP server" << std::endl;
-		}
+		if (tcp.connect(host, port, persistent, 0)) 
+			std::cerr << "connected\n";
+		else
+			std::cerr << "pending\n";
 	}
 
 	void TCP::Stop() {
@@ -507,6 +547,9 @@ namespace IO {
 		}
 		else if (option == "JSON") {
 			JSON = Util::Parse::Switch(arg);
+		}
+		else if (option == "PERSIST") {
+			persistent = Util::Parse::Switch(arg);
 		}
 		else
 			return filter.Set(option, arg);

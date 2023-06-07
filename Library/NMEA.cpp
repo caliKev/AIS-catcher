@@ -71,21 +71,27 @@ namespace AIS {
 			msg.setChannel(aivdm.channel);
 
 			addline(aivdm);
-			if (regenerate)
-				msg.buildNMEA(tag);
-			else
-				msg.NMEA.push_back(aivdm.sentence);
-			Send(&msg, 1, tag);
 
+			if (msg.validate()) {
+				if (regenerate)
+					msg.buildNMEA(tag);
+				else
+					msg.NMEA.push_back(aivdm.sentence);
+				Send(&msg, 1, tag);
+			}
+			else
+				std::cerr << "NMEA: invalid message of type " << msg.type() << " and length " << msg.getLength() << std::endl;
 			return;
 		}
 
 		int result = search(aivdm);
 
 		if (aivdm.number != result + 1 || result == -1) {
-			std::cerr << "NMEA: incorrect multiline messages @ [" << aivdm.sentence << "]." << std::endl;
 			clean(aivdm.channel, aivdm.talkerID);
-			if (aivdm.number != 1) return;
+			if (aivdm.number != 1) {
+				std::cerr << "NMEA: missing part of multiline message [" << aivdm.sentence << "]" << std::endl;
+				return;
+			}
 		}
 
 		queue.push_back(aivdm);
@@ -104,10 +110,15 @@ namespace AIS {
 			}
 		}
 
-		if (regenerate)
-			msg.buildNMEA(tag, aivdm.ID);
+		if (msg.validate()) {
+			if (regenerate)
+				msg.buildNMEA(tag, aivdm.ID);
 
-		Send(&msg, 1, tag);
+			Send(&msg, 1, tag);
+		}
+		else
+			std::cerr << "NMEA: invalid message of type " << msg.type() << " and length " << msg.getLength() << std::endl;
+
 		clean(aivdm.channel, aivdm.talkerID);
 	}
 
@@ -202,9 +213,9 @@ namespace AIS {
 
 		split(s);
 
-		if (parts.size() != 13) return false;
+		if (parts.size() != 13 && parts.size() != 12) return false;
 
-		const std::string& crc = parts[12];
+		const std::string& crc = parts[parts.size()-1];
 		int checksum = crc.size() > 2 ? (fromHEX(crc[crc.length() - 2]) << 4) | fromHEX(crc[crc.length() - 1]) : -1;
 
 		if (checksum != NMEAchecksum(line)) {
@@ -298,7 +309,11 @@ namespace AIS {
 		if (s[0] == '{') {
 			try {
 				JSON::Parser parser(&AIS::KeyMap, JSON_DICT_FULL);
+				parser.setSkipUnknown(true);
 				std::shared_ptr<JSON::JSON> j = parser.parse(s);
+
+				std::string cls = "";
+				std::string dev = "";
 
 				tag.ppm = 0;
 				tag.sample_lvl = 0;
@@ -307,6 +322,12 @@ namespace AIS {
 				// phase 1, get the meta data in place
 				for (const auto& p : j->getProperties()) {
 					switch (p.Key()) {
+					case AIS::KEY_CLASS:
+						cls = p.Get().getString();
+						break;
+					case AIS::KEY_DEVICE:
+						dev = p.Get().getString();
+						break;
 					case AIS::KEY_SIGNAL_POWER:
 						tag.level = p.Get().getFloat();
 						break;
@@ -319,17 +340,51 @@ namespace AIS {
 					}
 				}
 
-				for (const auto& p : j->getProperties()) {
-					if (p.Key() == AIS::KEY_NMEA) {
-
-						for (const auto& v : p.Get().getArray()) {
-							processAIS(v.getString(), tag, t);
+				if(cls == "AIS" && dev == "AIS-catcher") {
+					for (const auto& p : j->getProperties()) {
+						if (p.Key() == AIS::KEY_NMEA) {
+							if(p.Get().isArray()) {
+								for (const auto& v : p.Get().getArray()) {
+									processAIS(v.getString(), tag, t);
+								}
+							}
 						}
 					}
 				}
+
+				if(cls == "TPV") {
+					GPS gps;
+					
+					for (const auto& p : j->getProperties()) {
+						if (p.Key() == AIS::KEY_LAT) {
+							if(p.Get().isFloat()) {
+								gps.lat = p.Get().getFloat();
+							}
+							else if(p.Get().isInt()) {
+								gps.lat = p.Get().getInt();
+							}
+						}
+						else if (p.Key() == AIS::KEY_LON) {
+							if(p.Get().isFloat()) {
+								gps.lon = p.Get().getFloat();
+							}
+							else if(p.Get().isInt()) {
+								gps.lon = p.Get().getInt();
+							}
+						}
+					}
+
+					if (gps.lat != 0 || gps.lon != 0) { 
+
+						outGPS.Send(&gps, 1, tag);
+						std::cerr << "JSON: lat = " << gps.lat << ", lon = " << gps.lon << std::endl;
+					}
+				}
+
+
 			}
 			catch (std::exception const& e) {
-				std::cout << "UDP server: " << e.what() << std::endl;
+				std::cout << "NMEA model: " << e.what() << std::endl;
 			}
 		}
 	}
@@ -347,6 +402,7 @@ namespace AIS {
 					if (c == '{' && (prev == '\n' || prev == '\r')) {
 						line = c;
 						state = 1;
+						count = 1;
 					}
 					else if (c == '$' || c == '!') {
 						line = c;
@@ -364,11 +420,15 @@ namespace AIS {
 				// state = 1 (JSON) or state = 2 (NMEA)
 				if (state == 1) {
 					// we do not allow nested JSON, so processing until newline character or '}'
-					if (c == '}') {
-						t = 0;
-						tag.clear();
-						processJSONsentence(line, tag, t);
-						reset(c);
+					if (c == '{') count++;
+					else if (c == '}') {
+						--count;
+						if (!count) {
+							t = 0;
+							tag.clear();
+							processJSONsentence(line, tag, t);
+							reset(c);
+						}
 					}
 					else if (newline) {
 						std::cerr << "NMEA: newline in uncompleted JSON input not allowed";

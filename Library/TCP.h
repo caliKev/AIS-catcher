@@ -46,63 +46,44 @@
 #endif
 
 namespace TCP {
-	class Client {
 
-		SOCKET sock = -1;
-		int timeout = 2;
+	class Client {
+	public:
+		
+		Client() {}
+		~Client() { disconnect(); }
+
+		void disconnect();
+		bool connect(std::string host, std::string port, bool persist, int timeout);
+
+		void setResetTime(int t) { reset_time = t; }
+		int read(void* data, int length, int t, bool wait = false);
+		int send(const void* data, int length);
+	private:
+		enum State { DISCONNECTED, CONNECTING, READY };
+
+		std::string host;
+		std::string port;
+		bool persistent = true;
+		int reset_time = -1;
+		int timeout = 0;
+
+		int sock = -1;
+		State state = DISCONNECTED;
+		time_t stamp = 0;
 
 		struct addrinfo* address = NULL;
 
-	public:
-		bool connect(std::string host, std::string port);
-		void disconnect();
+		void updateState();
+		bool isConnected(int t);
 
-		void setTimeout(int t) { timeout = t; }
-		int read(void* data, int length, bool wait = false);
-		int send(const char* msg, int len) { return ::send(sock, msg, len, 0); }
-	};
-
-	class Client2 {
-
-		SOCKET sock = -1;
-
-		struct addrinfo* address;
-
-		enum { READY,
-			   CONNECTING } state = CONNECTING;
-
-		std::time_t stamp = 0;
-		std::string host, port;
-
-	public:
-		bool connect(std::string, std::string);
-		void disconnect();
-
-		void reconnect();
-
-		int read(void* data, int length, bool wait = false);
-		int send(const char* msg, int len) {
-
-			if (state != READY) reconnect();
-			if (sock == -1) return 0;
-
-			int n = ::send(sock, msg, len, 0);
-
-			if (n <= 0) {
-				if (state == READY)
-					std::cerr << "TCP: failed to write to server, resetting connection.\n";
-				reconnect();
+		bool reconnect() {
+			disconnect();
+			if (connect(host, port, persistent, timeout)) {
+				std::cerr << "TCP (" << host << ":" << port << "): connected." << std::endl;
+				return true;
 			}
-			if (n > 0) {
-				if (state == CONNECTING)
-					std::cerr << "TCP: connected to server.\n";
-
-				state = READY;
-			}
-
-			return n;
+			return false;
 		}
 	};
-
-
 }

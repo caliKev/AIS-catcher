@@ -135,7 +135,8 @@ namespace IO {
 		struct addrinfo* address = NULL;
 		int source = -1;
 		std::string host, port;
-		bool reconnect = false;
+		int reset = -1;
+		long last_reconnect = 0;
 		AIS::Filter filter;
 		bool JSON = false;
 
@@ -156,23 +157,18 @@ namespace IO {
 		void Stop();
 		void SendTo(std::string str) {
 
-			int sent = sendto(sock, str.c_str(), (int)str.length(), 0, address->ai_addr, (int)address->ai_addrlen);
-
-			if (reconnect && sent < 0) {
-				Stop();
-				Start();
-				sendto(sock, str.c_str(), (int)str.length(), 0, address->ai_addr, (int)address->ai_addrlen);
-			}
+			sendto(sock, str.c_str(), (int)str.length(), 0, address->ai_addr, (int)address->ai_addrlen);
 		}
 		void setJSON(bool b) { JSON = b; }
 	};
 
 	class TCP : public StreamIn<AIS::Message>, public Setting {
-		::TCP::Client2 tcp;
+		::TCP::Client tcp;
 		AIS::Filter filter;
 		bool JSON = false;
 		int source = -1;
 		std::string host, port;
+		bool persistent = true;
 
 	public:
 		virtual Setting& Set(std::string option, std::string arg);
@@ -180,11 +176,11 @@ namespace IO {
 		void Receive(const AIS::Message* data, int len, TAG& tag);
 
 		void Start();
-
 		void Stop();
-		void SendTo(std::string str) {
+		
+		int SendTo(std::string str) {
 
-			tcp.send(str.c_str(), (int)str.length());
+			return tcp.send(str.c_str(), (int)str.length());
 		}
 		void setJSON(bool b) { JSON = b; }
 	};

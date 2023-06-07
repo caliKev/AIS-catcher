@@ -1,6 +1,5 @@
-# AIS-catcher - A multi-platform AIS receiver 
-This package adds the ```AIS-catcher``` command - a dual channel AIS receiver for RTL-SDR dongles (including the ShipXplorer AIS dongle), AirSpy (Mini/R2/HF+), HackRF, SDRPlay, SoapySDR, input from file and from ZMQ and TCP servers (RTL-TCP/SpyServer). Output is send in the form of NMEA messages to either screen or broadcast over UDP
-The program provides the option to read and decode the raw discriminator output of a VHF receiver and NMEA text as well. It has a built-in simple webserver.
+# AIS-catcher: A comprehensive AIS Receiver for multiple platforms 
+This package introduces the `AIS-catcher` command, a dual-channel AIS receiver compatible with various hardware, including RTL-SDR dongles (such as the ShipXplorer AIS dongle), AirSpy (Mini/R2/HF+), HackRF, SDRPlay, SoapySDR, file input, and ZMQ and TCP servers (RTL-TCP/SpyServer). The output is delivered as NMEA messages, which can be displayed on screen or broadcast via UDP/HTTP/TCP. AIS-catcher is a lightweight command line utility and includes a built-in web server for use on secure internal networks.
 <p align="center">
   <img src="https://user-images.githubusercontent.com/52420030/219856752-b3a09051-b913-49bd-8af3-bca2e7a25130.png" width="30%"/>
 </p>
@@ -13,7 +12,7 @@ The aim of ```AIS-catcher``` is to provide a platform to facilitate continuous i
 
 ### Disclaimer
 
-```AIS-catcher```  is created for research and educational purposes under the GPGL v3 license. It is a hobby project and not tested and designed for reliability and correctness. 
+```AIS-catcher```  is created for research and educational purposes under the GNU GPL v3 license. It is a hobby project and not tested and designed for reliability and correctness. 
 You can play with the software but it is the user's responsibility to use it prudently. So,  DO NOT rely upon this software in any way including for navigation 
 and/or safety of life or property purposes.
 There are variations in the legislation concerning radio reception in the different administrations around the world. 
@@ -21,57 +20,18 @@ It is your responsibility to determine whether or not your local administration 
 It is specifically forbidden to use this software for any illegal purpose whatsoever. 
 Only use this software in regions where such use is permitted.
 
+## What's new?
+
+Latest version is **v0.47** with various improvements to the user interface of the webclient and smaller additions, like connecting to a GPSD server.
+
 ## Installation
 
 Windows [Binaries](https://github.com/jvde-github/AIS-catcher/blob/main/README.md#Build-process) and Building [instructions](https://github.com/jvde-github/AIS-catcher/blob/main/README.md#Build-process) for many systems are provided below. Pre-built container images containing AIS-catcher are [available](https://github.com/jvde-github/AIS-catcher#container-images)  from the GitHub Container Registry.
 
-## What's new?
-For new features in the latest version please have a look at the [release page](https://github.com/jvde-github/AIS-catcher/releases/tag/v0.44). 
+<p align="center">
+<img width="40%" alt="image" src="https://github.com/jvde-github/AIS-catcher/assets/52420030/81dc1e95-0609-4270-9460-ab3cbdb36ddf">
+</p>
 
- - **About page**: the user can make a page in [markdown format](https://www.markdownguide.org/basic-syntax/). The content will be shown in the About tab of the webserver:
-```console
-AIS-catcher -N 8100 ABOUT about.md
-```
-- **AIS2ADSB**: A simple script to export AIS messages to ADS-B format so SAR aircraft (and ships if needed) can be visualized in Virtual Radar Server. See [here](https://github.com/jvde-github/ais2adsb)
-- **Prometheus/Grafana interface**: First functionality to output some metrics from AIS-catcher to Prometheus, see [here](https://github.com/jvde-github/AIS-catcher/blob/main/README.md#sending-data-to-prometheus-for-use-in-grafana-dashboards).
-- **JSON over UDP output**: functionality to send NMEA messages packaged in a JSON object, e.g.:
-```console
-AIS-catcher -u 192.168.1.235 4002 JSON on
-```
-- **JSON over UDP input**: AIS-catcher accepts and parses this input when running as a UDP server, e.g.:
-```console
-AIS-catcher -x 192.168.1.235 4002
-```
-Most external programs will not be able to accept this JSON packaged NMEA strings. It is a way to transfer received messages between AIS-catcher instances without losing meta data like the timestamp, ppm correction and signal level. These are not captured in the standard NMEA strings.
-- **Writing AIS to PostgreSQL**: The setup is fairly flexible and can be tailored to the particular needs.  See below for more details. 
-
-### GPS, multiple receivers and plot station location on map
-
-The latest version can run with multiple receivers in parallel. For example, one dongle for channel A+B and one dongle for channel C+D. To run with two receivers in parallel you can use a command like:
-```console
-AIS-catcher -d serial1 -v -d serial2 -c CD -v -N 8100
-```
-
-There are a few other options that together can provide some interesting new functionality. Firstly, the webserver can share the location of the station with the front-end so it will be displayed on the map:
-```console
-AIS-catcher -N 8100 share_loc on
-```
-This option is switched off by default for privacy reasons in case the webclient is shared externally.
-And secondly, the NMEA decoder accepts NMEA lines from a GPS device (NMEA lines GPRMC, GPGLL and GPGGA):
-```console
-echo '$GPGGA, 161229.487, 3723.2475, N, 12158.3416, W, 1, 07, 1.0, 9.0, M, , , , 0000*18' | ./AIS-catcher -r txt .
-```
-These GPS coordinates will be used to set the location of the station. In this way the station can be visualized and tracked while on the move. This is useful if you 
-use AIS-catcher to read from a hardware AIS receiver that has a built-in GPS.
-
-All these new functions combined enables a command line like this:
-```console
-AIS-catcher -r txt /dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_7_-_GPS_GNSS_Receiver-if00 -x 192.168.1.235 4002 -N 8100 share_loc on
-```
-The first receiver (`-r txt ...`) reads from a GPS device that is connected and emits NMEA lines. The second receiver (`-x`) reads AIS NMEA lines at port 4002 coming from another instance of AIS-catcher. The station is now plotted on the map with the location as provided
-by the GPS coordinates. The web-page has the ability to fix the center of the map on the location of the receiving station.
-
-This functionality is new so reporting of bugs is appreciated. 
 
 ## Usage
 ````
@@ -90,6 +50,7 @@ use: AIS-catcher [options]
 	[-N [optional: port][optional settings] - start http server at port, see README for details]
 	[-o set output mode (0 = quiet, 1 = NMEA only, 2 = NMEA+, 3 = NMEA+ in JSON, 4 JSON Sparse, 5 JSON Full (default: 2)]
 	[-p xxx - set frequency correction for device in PPM (default: zero)]
+	[-P xxx.xx.xx.xx yyy - TCP destination address and port (default: off)]
 	[-q suppress NMEA messages to screen (-o 0)]
 	[-s xxx - sample rate in Hz (default: based on SDR device)]
 	[-T xx - auto terminate run with SDR after xxx seconds (default: off)]
@@ -163,7 +124,7 @@ To find the best settings for your hardware requires some systematic experimenta
 ## Deep dives
 ![Image](https://raw.githubusercontent.com/jvde-github/AIS-catcher/media/media/containership.jpg)
 
-### Message screen output
+### Output of messages to screen
 
 The output of messages to screen can be regulated with the ``-o`` switch. To suppress any messages to screen use ``-o 0`` or ``-q``. This can be useful if you run AIS-catcher as a background process. To show only simple and pure NMEA lines, use the switch ``-o 1`` or ``-n``. Example output:
 ```
@@ -187,20 +148,13 @@ Meta data is not calculated by default to keep the program as light as possible 
 There are many libraries for decoding AIS messages to JSON format. I encourage you to use your favorite library ([libais](https://github.com/schwehr/libais), [gpsdecode](https://github.com/ukyg9e5r6k7gubiekd6/gpsd/blob/master/gpsdecode.c), [pyais](https://github.com/M0r13n/pyais), etc).
 
 ### Web interface
-As per full release v0.42 AIS-catcher includes a simple web interface. Live demos are available for [East Boston, US](https://kx1t.com/ais/) and [Hai Phong, Vietnam](https://hpradar.com/aisv3/). Thank you [KX1T](https://kx1t.com/) and [Nguyen](https://hpradar.com/) for making this available. There is also a version of the [Comar R400N](https://comarsystems.com/product/r400n-network-ais-receiver-for-coastal-monitoring-applications/) running via AIS-catcher [here](https://hpradar.com/aisr4/) whereby input is NMEA text lines over serial as input and AIS-catcher only does the distribution and web visualization. 
-
-The web-interface gratefully uses the following libraries: [chart.js](https://www.chartjs.org/docs/latest/charts/line.html), chart.js [annotation plugin](https://www.chartjs.org/chartjs-plugin-annotation/latest/), [leaflet](https://leafletjs.com/), [Font Awesome](https://fontawesome.com/) and [flag-icons](https://github.com/lipis/flag-icons), [marked](https://github.com/markedjs/marked). 
+As per full release v0.42 AIS-catcher includes a simple web interface. A live demo is available for [East Boston, US](https://kx1t.com/ais/). The web-interface gratefully uses the following libraries: [chart.js](https://www.chartjs.org/docs/latest/charts/line.html), chart.js [annotation plugin](https://www.chartjs.org/chartjs-plugin-annotation/latest/), [leaflet](https://leafletjs.com/), [Material Design Icons](https://m3.material.io/styles/icons/overview), tabulator, [marked](https://github.com/markedjs/marked) and [flag-icons](https://github.com/lipis/flag-icons). 
 
 Make sure you use the latest version and start the webserver as follows:
 ```console
 AIS-catcher -N 8100
 ```
 where ``8100`` is the port number. If you go in your browser to the IP address of the machine running AIS-catcher and specify the port (e.g. if your machine is raspberrypi, enter ``raspberrypi:8100``) you will see a menu which gives access to tabs providing insights into the reception of your station, including signal levels, ships seen, a simple map and message rate.  
-Some development has been done to make this webinterface easily accessible on mobile devices as well (see screenshot) and enriching the experience, for example by adding the contours of a vessel where available: 
-
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/52420030/219856813-36a8a220-dc8a-4cf5-9390-0ce523454c55.png" width="30%"/>
-</p>
 
 There is an option to provide the station name and a link to an external website which will be displayed on the Statistics page as follows:
 ```console
@@ -208,11 +162,20 @@ AIS-catcher -N STATION Southwood STATION_LINK http://example.com
 ```
 This could be a useful option if you want to offer the interface externally. To display the distance of received messages to your station you need to provide the coordinates as follows:
 ```console
-AIS-catcher -N LAT 50 LON 3.141592
+AIS-catcher -N LAT 50 LON 3.141592 SHARE_LOC on
+```
+The first two parameters in this example are needed to be able to calculate the distance to the station. The last option (default is off) will pass on and display the station location to the webclient.  
+ The user can make a page in [markdown format](https://www.markdownguide.org/basic-syntax/). The content will be shown in the About tab of the webserver:
+```console
+AIS-catcher -N 8100 ABOUT about.md
 ```
 All these options can be captured in the configuration file (in a section with name ``server``), see below. 
 
-### User interface and visualization
+### User interface 
+
+The main menu tabs on top allow switching between different  functional areas. More functionality is available  through the use of context-sensitive menus, accessible through a right-click or long press on iOS. These options include a theme for dark mode, the display of the station range on the map, simplified adjustment of the map's center, switch to text-only shiplabels, optional decluttering of shiplabels, and showing details on the last received messsage from a vessel, among others.
+
+### Visualization
 
 When AIS-catcher receives data that contains the dimensions of a vessel but not its heading, it will plot a circle that will enclose the ships dimensions regardless of the direction it is pointing.
 This commonly happens with Class B ships and if a reasonable approximation for heading, such as the course-over-ground, is available, it will be used as a proxy. Any shapes that are plotted this way will have a dashed border, to indicate that the information is incomplete. An example of this can be seen in the historical frigate the USS Constitution, which is docked in the port of Boston. 
@@ -323,7 +286,25 @@ As a final comment, to build AIS-catcher with HTTP support, please install the f
 sudo apt install libcurl4-openssl-dev zlib1g-dev
 ```
 
-### Setting up OpenCPN
+### Input/output of AIS messages over UDP and TCP
+
+AIS messages can be forwarded between applications over UDP via the `-u` switch and TCP using `-P` as we have seen in the examples above.
+Additionally, AIS-catcher has the option to send NMEA messages packaged in a JSON object:
+```console
+AIS-catcher -u 192.168.1.235 4002 JSON on
+```
+This will send over the NMEA lines plus additional meta data like signal level etc. The program also accepts and parses this input when running as a UDP server, e.g.:
+```console
+AIS-catcher -x 192.168.1.235 4002
+```
+Most external programs will not be able to accept this JSON packaged NMEA strings. It is a way to transfer received messages between AIS-catcher instances without losing meta data like the timestamp, ppm correction and signal level. These are not captured in the standard NMEA strings. 
+
+A feature has been added that sends messages to (e.g.) MarineTraffic as a TCP client (with auto-reconnect) using the `-P` switch. For example:
+````
+AIS-catcher -P 5.9.207.224 6767 -P 192.168.1.239 2947 
+````
+
+#### Setting up OpenCPN
 
 In this example we have AIS-catcher running on a Raspberry PI and want to receive the messages in OpenCPN running on a Windows computer with IP address ``192.168.1.239``. We have chosen to use port ``10101``. On the Raspberry we start AIS-catcher with the following command to send the NMEA messages to the Windows machine:
 ```console
@@ -434,6 +415,13 @@ An example config file looks as follows:
       "lat":52.0,
       "lon":4.3
    },
+   "tcp": [
+      {
+         "active": true,
+         "host": "5.9.207.224",
+         "port": 12
+      }
+   ],
    "udp":[
       {
          "host":"ais.fleetmon.com",
@@ -494,7 +482,7 @@ netcat  153.44.253.27  5631 | AIS-catcher -r txt . -o 5
 
 For input via TCP you can skip the `netcat` command and directly read the input into the program as follows:
 ```console
-AIS-catcher -t 153.44.253.27 5631 -gt FORMAT txt PROTOCOL none
+AIS-catcher -t txt 153.44.253.27 5631
 ```
 Again, the `FORMAT txt` option switches of the buffering and automatically selects the NMEA decoder.
 
@@ -513,13 +501,43 @@ returns a warning on the incorrect CRC and:
 ```
 Note that CRC/checksum is the simple xor-checksum for validating that the NMEA line is not corrupted and not the CRC that is transmitted with the AIS message for a decoder to check the correct reception over air. This latter 16 bit checksum/CRC is not included in the NMEA message.
 
+### GPS, multiple devices and plot station location on the webserver map
+
+The latest version can run with multiple receivers in parallel. For example, one dongle for channel A+B and one dongle for channel C+D. To run with two receivers in parallel you can use a command like:
+```console
+AIS-catcher -d serial1 -v -d serial2 -c CD -v -N 8100
+```
+
+There are a few other options that together can provide some interesting new functionality. Firstly, the webserver can share the location of the station with the front-end so it will be displayed on the map:
+```console
+AIS-catcher -N 8100 share_loc on
+```
+This option is switched off by default for privacy reasons in case the webclient is shared externally.
+And secondly, the NMEA decoder accepts NMEA lines from a GPS device (NMEA lines GPRMC, GPGLL and GPGGA):
+```console
+echo '$GPGGA, 161229.487, 3723.2475, N, 12158.3416, W, 1, 07, 1.0, 9.0, M, , , , 0000*18' | ./AIS-catcher -r txt .
+```
+These GPS coordinates will be used to set the location of the station. In this way the station can be visualized and tracked while on the move. This is useful if you 
+use AIS-catcher to read from a hardware AIS receiver that has a built-in GPS.
+Another approach is to read from a GPSD server, in case it sits at post 2947 of the local PC: 
+```console
+AIS-catcher -t gpsd localhost 2947 -N 8100 share_loc on` 
+```
+
+All these new functions combined enables a command line like this:
+```console
+AIS-catcher -r txt /dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_7_-_GPS_GNSS_Receiver-if00 192.168.1.235 4002 -N 8100 share_loc on
+```
+The first receiver (`-r txt ...`) reads from a GPS device that is connected and emits NMEA lines. The second receiver (`-x`) reads AIS NMEA lines at port 4002 coming from another instance of AIS-catcher. The station is now plotted on the map with the location as provided
+by the GPS coordinates. The web-page has the ability to fix the center of the map on the location of the receiving station.
+
 ### Writing AIS messages to a Database
 
 As per full release `v0.45` there is functionality to write messages to a database (PostgreSQL). The setup is fairly flexible and can be tailored to the particular needs. First create an empty PostgreSQL database, e.g on an Ubuntu distribution (this might be different on your system):
 ```console
 sudo -u postgres createdb ais
 ```
-Set up the necessary tables:
+Set up the necessary tables from the AIS-catcher directory:
 ```console
 psql ais <DBMS/create.sql 
 ```
@@ -800,7 +818,10 @@ It will likely run out of the box in case you have already RTL-SDR software runn
 
 Recent releases:
  | Version | Win32  | x64 |  Win32 + SDRPlay | x64 + SDRPlay | 
- | :--- | :--- | :---: |   :--- | :---: |     
+ | :--- | :--- | :---: |   :--- | :---: | 
+ |v0.47| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.47/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.47/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.47/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.47/AIS-catcher.SDRPLAY.x64.zip) |
+   |v0.46| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.46/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.46/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.46/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.46/AIS-catcher.SDRPLAY.x64.zip) |
+  |v0.45| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.45e/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.45e/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.45e/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.45e/AIS-catcher.SDRPLAY.x64.zip) |
  |v0.44| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.44/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.44/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.44/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.44/AIS-catcher.SDRPLAY.x64.zip) |
  |v0.41| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.41/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.41/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.41/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.41/AIS-catcher.SDRPLAY.x64.zip) |
  |v0.40| [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.40b/AIS-catcher.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.40b/AIS-catcher.x64.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.40b/AIS-catcher.SDRPLAY.x86.zip) | [ZIP](https://github.com/jvde-github/AIS-catcher/releases/download/v0.40b/AIS-catcher.SDRPLAY.x64.zip) | 
@@ -939,7 +960,7 @@ Please note that the runs are performed on different days over different time sp
 ### Frequency offset
 AIS-catcher tunes in on a frequency of 162 MHz. However, due to deviations in the internal oscillator of RTL-SDR devices, the actual frequency can be slightly off which will result in no or poor reception of AIS signals. It is therefore important to provide the program with the necessary correction in parts-per-million (ppm) to offset this deviation where needed. For most of our testing we have used the RTL-SDR v3 dongle where in principle no frequency correction is needed as deviations are guaranteed to be small. For optimal reception though ensure you determine the necessary correction, e.g. [see](https://github.com/steve-m/kalibrate-rtl) and provide as input via the ```-p``` switch on the command line.
 
-If you are using a cheap RTL-SDR dongle that suffers from thermal drift (i.e. the required PPM correction drifts when the dongle is getting warmer), you could consider to use the option ``-o AFC_WIDE on`` or switch to a FM decoding model which is less sensitive for frequency offsets (``-m 0``). The frequency correction applied by the default decoding model can be made visible with the switch ``-M D`` so you can inspect.
+If you are using a cheap RTL-SDR dongle that suffers from thermal drift (i.e. the required PPM correction drifts when the dongle is getting warmer), you could consider to use the option ``-go AFC_WIDE on`` or switch to a FM decoding model which is less sensitive for frequency offsets (``-m 0``). The frequency correction applied by the default decoding model can be made visible with the switch ``-M D`` so you can inspect.
 
 ### System USB performance
 On some laptops we observed that Windows was struggling with high volume of data transferred from the RTL SDR dongle to the PC. I am not sure why (likely some driver issue as Ubuntu on the same machine worked fine) but it is worthwhile to check if your system supports transferring from the dongle at a sampling rate of 1.536 MHz with the following command which is part of the osmocom rtl-sdr package:

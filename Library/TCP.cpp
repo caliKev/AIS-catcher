@@ -17,18 +17,33 @@
 
 #include <cstring>
 #include <string>
+
 #include "TCP.h"
+#include "Common.h"
 
 namespace TCP {
+
 	void Client::disconnect() {
 		if (sock != -1)
 			closesocket(sock);
+
+		if (address != NULL) {
+			freeaddrinfo(address);
+			address = NULL;
+		}
+
+		sock = -1;
+		state = DISCONNECTED;
 	}
 
-	bool Client::connect(std::string host, std::string port) {
+	bool Client::connect(std::string host, std::string port, bool persist, int timeout) {
 		int r;
 		struct addrinfo h;
-		fd_set fdr, fdw;
+
+		this->host = host;
+		this->port = port;
+		this->persistent = persist;
+		this->timeout = timeout;
 
 		std::memset(&h, 0, sizeof(h));
 		h.ai_family = AF_UNSPEC;
@@ -55,8 +70,12 @@ namespace TCP {
 		ioctlsocket(sock, FIONBIO, &mode);
 #endif
 
-		if (::connect(sock, address->ai_addr, (int)address->ai_addrlen) != -1)
+		stamp = time(NULL);
+
+		if (::connect(sock, address->ai_addr, (int)address->ai_addrlen) != -1) {
+			state = READY;
 			return true;
+		}
 
 #ifndef _WIN32
 		if (errno != EINPROGRESS) {
@@ -66,13 +85,21 @@ namespace TCP {
 		}
 #endif
 
+		return isConnected(timeout);
+	}
+
+	bool Client::isConnected(int t) {
+
+		if (state == READY) return true;
+		fd_set fdr, fdw;
+
 		FD_ZERO(&fdr);
 		FD_SET(sock, &fdr);
 
 		FD_ZERO(&fdw);
 		FD_SET(sock, &fdw);
 
-		timeval to = { timeout, 0 };
+		timeval to = { t, 1 };
 
 		if (select(sock + 1, &fdr, &fdw, NULL, &to) > 0) {
 			int error;
@@ -81,111 +108,122 @@ namespace TCP {
 			getsockopt(sock, SOL_SOCKET, SO_ERROR, (char*)&error, &len);
 			if (error != 0) return false;
 
-			return true;
-		}
-		return false;
-	}
-
-	int Client::read(void* data, int length, bool wait) {
-		fd_set fd;
-
-		FD_ZERO(&fd);
-		FD_SET(sock, &fd);
-
-		timeval to = { timeout, 0 };
-
-		if (select(sock + 1, &fd, NULL, NULL, &to) < 0) {
-			return -1;
-		}
-
-		if (FD_ISSET(sock, &fd)) {
-			return recv(sock, (char*)data, length, wait ? MSG_WAITALL : 0);
-		}
-		return 0;
-	}
-
-	// Client 2 - experimental
-
-	void Client2::disconnect() {
-		if (sock != -1)
-			closesocket(sock);
-		sock = -1;
-	}
-
-	bool Client2::connect(std::string hst, std::string prt) {
-
-		int r;
-		struct addrinfo h;
-		fd_set fdr, fdw;
-
-		host = hst;
-		port = prt;
-
-		std::memset(&h, 0, sizeof(h));
-		h.ai_family = AF_UNSPEC;
-		h.ai_socktype = SOCK_STREAM;
-		h.ai_protocol = IPPROTO_TCP;
-
-#ifndef _WIN32
-		h.ai_flags = AI_ADDRCONFIG;
-#endif
-
-		int code = getaddrinfo(host.c_str(), port.c_str(), &h, &address);
-		if (code != 0 || address == NULL) return false;
-
-		sock = socket(address->ai_family, address->ai_socktype, address->ai_protocol);
-		if (sock == -1) return false;
-
-#ifndef _WIN32
-		r = fcntl(sock, F_GETFL, 0);
-		r = fcntl(sock, F_SETFL, r | O_NONBLOCK);
-
-		if (r == -1) return false;
-#else
-		u_long mode = 1; // 1 to enable non-blocking socket
-		ioctlsocket(sock, FIONBIO, &mode);
-#endif
-		std::cerr << "TCP: attempting to connect to server " << host << " on port " << port << ".\n";
-
-		stamp = std::time(0);
-		state = CONNECTING;
-
-		int n = ::connect(sock, address->ai_addr, (int)address->ai_addrlen);
-		if (n != -1) {
-			std::cerr << "TCP: server " << host << " ready on port " << port << ". without delay\n";
 			state = READY;
 			return true;
 		}
 
-		std::cerr << "Output connect " << strerror(errno) << std::endl;
-
-
-		return true;
-	}
-
-	void Client2::reconnect() {
 		state = CONNECTING;
-		if (((long)std::time(0) - (long)stamp) > 30) {
-			disconnect();
-			connect(host, port);
+		return false;
+	}
+
+
+	void Client::updateState() {
+
+		if (state == READY && reset_time > 0 && (long)time(NULL) - (long)stamp > reset_time * 60) {
+			std::cerr << "TCP (" << host << ":" << port << "): connection expired, reconnect." << std::endl;
+			reconnect();
+		}
+
+		if (state == DISCONNECTED) {
+			if ((long)time(NULL) - (long)stamp > 10) {
+				std::cerr << "TCP (" << host << ":" << port << "): not connected, reconnecting." << std::endl;
+				if (connect(host, port, persistent, timeout)) {
+					std::cerr << "TCP (" << host << ":" << port << "): connected." << std::endl;
+					return;
+				}
+			}
+		}
+
+		if (state == CONNECTING) {
+			bool connected = isConnected(0);
+
+			if (connected) {
+				std::cerr << "TCP (" << host << ":" << port << "): connected to server." << std::endl;
+			}
+			else if ((long)time(NULL) - (long)stamp > 10) {
+				std::cerr << "TCP (" << host << ":" << port << "): timeout connecting to server, reconnect." << std::endl;
+				reconnect();
+				return;
+			}
 		}
 	}
 
-	int Client2::read(void* data, int length, bool wait) {
-		fd_set fd;
+	int Client::send(const void* data, int length) {
 
-		FD_ZERO(&fd);
-		FD_SET(sock, &fd);
+		updateState();
 
-		timeval to = { 0, 0 };
+		if (state == READY) {
+			int sent = ::send(sock, (char*)data, length, 0);
 
-		if (select(sock + 1, NULL, &fd, NULL, &to) < 0) {
-			return -1;
+			if (sent < length) {
+					int error_code = errno; 
+#ifdef _WIN32
+					if (error_code == WSAEWOULDBLOCK) return 0;
+#else
+					if (error_code == EAGAIN || error_code == EWOULDBLOCK) return 0;
+#endif
+					std::cerr << "TCP (" << host << ":" << port << "): send error. Error code: " << error_code << " (" << strerror(error_code) << ").";
+					if (persistent) {
+						reconnect();
+						std::cerr << " Reconnect.\n";
+						return 0;
+					}
+					else {
+						std::cerr << std::endl;
+						return -1;
+					}
+				}
+			return sent;
 		}
 
-		if (FD_ISSET(sock, &fd)) {
-			return recv(sock, (char*)data, length, wait ? MSG_WAITALL : 0);
+		return 0;
+	}
+
+	// zero if no input yet or connection being established
+	int Client::read(void* data, int length, int t, bool wait) {
+
+		updateState();
+
+		if (state == READY) {
+			fd_set fd, fe;
+
+			FD_ZERO(&fd);
+			FD_SET(sock, &fd);
+
+			FD_ZERO(&fe);
+			FD_SET(sock, &fe);
+
+			timeval to = { t, 0 };
+
+			if (select(sock + 1, &fd, NULL, &fe, &to) < 0) return 0;			
+
+			if (FD_ISSET(sock, &fd) || FD_ISSET(sock, &fe)) {
+				int retval = recv(sock, (char*)data, length, wait ? MSG_WAITALL : 0);
+
+				if (retval <= 0) {
+					int error_code = errno;
+#ifdef _WIN32
+					if (error_code == WSAEWOULDBLOCK) return 0;
+#else
+					if (error_code == EAGAIN || error_code == EWOULDBLOCK) return 0;
+#endif
+
+					std::cerr << "TCP (" << host << ":" << port << "): receive error. Error code: " << error_code << " (" << strerror(error_code) << ").";
+
+					if (persistent) {
+						std::cerr << " Reconnect.\n";
+						reconnect();
+						return 0;
+					}
+					else {
+						std::cerr << std::endl;
+						return -1;
+					}					
+				}
+				return retval;
+			}
 		}
+
 		return 0;
 	}
 }

@@ -628,6 +628,7 @@ void WebClient::Request(IO::Client& c, const std::string& response, bool gzip) {
 		content += "\"build_version\":\"" + std::string(VERSION) + "\",";
 		content += "\"build_describe\":\"" + std::string(VERSION_DESCRIBE) + "\",";
 		content += "\"run_time\":\"" + std::to_string((long int)time(0) - (long int)time_start) + "\",";
+		content += "\"memory\":" + std::to_string(Util::Helper::getMemoryConsumption()) + ",";
 
 		std::string unit;
 		const uint64_t GB = 1000000000;
@@ -654,6 +655,10 @@ void WebClient::Request(IO::Client& c, const std::string& response, bool gzip) {
 		std::string content = ships.getJSON();
 		Response(c, "application/json", content, use_zlib & gzip);
 	}
+	else if (r == "/ships_array.json") {
+		std::string content = ships.getJSONcompact();
+		Response(c, "application/json", content, use_zlib & gzip);
+	}
 	else if (r == "/ships_full.json") {
 
 		std::string content = ships.getJSON(true);
@@ -669,16 +674,46 @@ void WebClient::Request(IO::Client& c, const std::string& response, bool gzip) {
 		Response(c, "text/markdown", about, use_zlib & gzip);
 	}
 	else if (r == "/path.json") {
+		std::stringstream ss(a);
+		std::string mmsi_str;
+		std::string content = "{";
+
+		while (std::getline(ss, mmsi_str, ',')) {
+			try {
+				int mmsi = std::stoi(mmsi_str);
+				if (mmsi >= 1 && mmsi <= 999999999) {
+					if (content.length() > 1) content += ",";
+					content += "\"" + std::to_string(mmsi) + "\":" + ships.getPathJSON(mmsi);
+				}
+			} catch (const std::invalid_argument& e) {
+				std::cerr << "Server: path MMSI invalid: " << mmsi_str << std::endl;
+			} catch (const std::out_of_range& e) {
+				std::cerr << "Server: path MMSI out of range: " << mmsi_str << std::endl;
+			}
+		}
+		content += "}";
+		Response(c, "application/json", content, use_zlib & gzip);
+	}
+	else if (r == "/message") {
 		int mmsi = -1;
 		std::stringstream ss(a);
-		ss >> mmsi;
-		if (mmsi >= 1 && mmsi <= 999999999) {
-			std::string content = ships.getPathJSON(mmsi);
-			Response(c, "application/json", content, use_zlib & gzip);
+	    if (ss >> mmsi && mmsi >= 1 && mmsi <= 999999999) {
+			std::string content = ships.getMessage(mmsi);
+			Response(c, "application/text", content, use_zlib & gzip);
 		}
 		else
-			Response(c, "application/json", "[]");
+			Response(c, "application/text","Message not availaible");
 	}
+	else if (r == "/vessel") {
+		std::stringstream ss(a);
+		int mmsi;
+		if (ss >> mmsi && mmsi >= 1 && mmsi <= 999999999) {
+			std::string content = ships.getShipJSON(mmsi);
+			Response(c, "application/text", content, use_zlib & gzip);
+		} else {
+			Response(c, "application/text", "Vessel not available");
+		}
+	}	
 	else if (r == "/history_full.json") {
 
 		std::string content = "{";
@@ -731,12 +766,33 @@ Setting& WebClient::Set(std::string option, std::string arg) {
 	}
 	else if (option == "LAT") {
 		lat = Util::Parse::Float(arg);
+		plugins += "param_lat=" + std::to_string(lat) + ";\n";
+	}
+	else if (option == "CUTOFF") {
+		int cutoff = Util::Parse::Integer(arg, 0, 10000);
+		hist_minute.setCutoff(cutoff);
+		hist_second.setCutoff(cutoff);
+		hist_hour.setCutoff(cutoff);
+		hist_day.setCutoff(cutoff);
+		dataPrometheus.setCutOff(cutoff);
+		counter.setCutOff(cutoff);
+	}
+	else if (option == "STAT_LOG") {
+		hist_day.setLog(true);
 	}
 	else if (option == "SHARE_LOC") {
-		ships.setShareLatLon(Util::Parse::Switch(arg));
+		bool b = Util::Parse::Switch(arg);
+		ships.setShareLatLon(b);
+		plugins += "param_share_loc=" + (b ? std::string("true;\n") : std::string("false;\n"));
+	}
+	else if (option == "MESSAGE" || option == "MSG") {
+		bool b = Util::Parse::Switch(arg);
+		ships.setMsgSave(b);
+		plugins += "message_save=" + (b ? std::string("true;\n") : std::string("false;\n"));
 	}
 	else if (option == "LON") {
 		lon = Util::Parse::Float(arg);
+		plugins += "param_lon=" + std::to_string(lon) + ";\n";
 	}
 	else if (option == "HISTORY") {
 		ships.setTimeHistory(Util::Parse::Integer(arg, 5, 3600));

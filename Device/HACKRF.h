@@ -29,7 +29,7 @@ namespace Device {
 #ifdef HASHACKRF
 
 		hackrf_device* device = NULL;
-		hackrf_device_list_t* list = NULL;
+		static hackrf_device_list_t* list;
 		std::string serial;
 
 		int LNA_Gain = 8;
@@ -46,7 +46,10 @@ namespace Device {
 			if (hackrf_init() != HACKRF_SUCCESS) throw std::runtime_error("HACKRF: Cannot open hackrf library");
 		}
 		~HACKRF() {
-			if (list) hackrf_device_list_free(list);
+			if (list) {
+				hackrf_device_list_free(list);
+				list = NULL;
+			}
 		}
 
 		// Control

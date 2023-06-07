@@ -29,7 +29,7 @@ namespace AIS {
 
 	class GPS {
 	public:
-		float lat, lon, heading, speed;
+		float lat = 0, lon = 0, heading = 0, speed = 0;
 	};
 
 	class Message {
@@ -75,6 +75,15 @@ namespace AIS {
 			length = 0;
 			NMEA.resize(0);
 			std::memset(data, 0, 128);
+		}
+
+		bool validate() {
+			const int ml[27] = { 149, 149, 149, 168, 418, 88, 72, 56, 168, 70, 168, 72, 40, 40, 88, 92, 80, 168, 312, 70, 271, 145, 154, 160, 72, 60, 96 };
+
+			if (type() < 1 || type() > 27) return false;
+			if (getLength() < ml[type() - 1]) return false;
+
+			return true;
 		}
 
 		unsigned type() const {

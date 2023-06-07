@@ -96,6 +96,22 @@ namespace DSP {
 		}
 	};
 
+	class DownsampleMovingAverage : public SimpleStreamInOut<CFLOAT32, CFLOAT32> {
+		CFLOAT32 D;
+		int idx_out = 0;
+		int idx_in = 0;
+		int df = 0;
+		int in_rate = 0;
+		int out_rate = 0;
+		const int BLOCK_SIZE = 8192;
+
+		std::vector<CFLOAT32> output;
+
+	public:
+		void Receive(const CFLOAT32* data, int len, TAG& tag);
+		void setRates(int in, int out) { in_rate = in; out_rate = out; }
+	};
+
 	class Downsample2CIC5 : public SimpleStreamInOut<CFLOAT32, CFLOAT32> {
 		CFLOAT32 h0 = 0, h1 = 0, h2 = 0, h3 = 0, h4 = 0;
 		std::vector<CFLOAT32> output;
@@ -286,16 +302,19 @@ namespace DSP {
 	class SquareFreqOffsetCorrection : public SimpleStreamInOut<CFLOAT32, CFLOAT32> {
 		std::vector<CFLOAT32> output;
 		std::vector<CFLOAT32> fft_data;
+		std::vector<FLOAT32> cumsum;
 
 		CFLOAT32 rot = 1.0f;
 		int N = 2048;
 		int logN = 11;
 		int count = 0;
 		int window = 750;
+		bool wide = false;
 
 		FLOAT32 correctFrequency();
 
 	public:
+		void setWide(bool b) { wide = b; }
 		void setParams(int, int);
 		void Receive(const CFLOAT32* data, int len, TAG& tag);
 	};

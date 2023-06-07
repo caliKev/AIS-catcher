@@ -26,6 +26,8 @@ namespace Device {
 
 #ifdef HASHACKRF
 
+	hackrf_device_list_t* HACKRF::list = NULL;
+	
 	void HACKRF::Open(uint64_t h) {
 		if (!list) throw std::runtime_error("HACKRF: cannot open device, internal error.");
 		if (h > list->devicecount) throw std::runtime_error("HACKRF: cannot open device.");
@@ -75,11 +77,14 @@ namespace Device {
 
 		if (hackrf_set_sample_rate(device, sample_rate) != HACKRF_SUCCESS) throw std::runtime_error("HACKRF: cannot set sample rate.");
 		if (hackrf_set_baseband_filter_bandwidth(device, hackrf_compute_baseband_filter_bw(sample_rate)) != HACKRF_SUCCESS) throw std::runtime_error("HACKRF: cannot set bandwidth filter to auto.");
-		if (hackrf_set_freq(device, frequency) != HACKRF_SUCCESS) throw std::runtime_error("HACKRF: cannot set frequency.");
+		if (hackrf_set_freq(device, getCorrectedFrequency()) != HACKRF_SUCCESS) throw std::runtime_error("HACKRF: cannot set frequency.");
 	}
 
 	void HACKRF::getDeviceList(std::vector<Description>& DeviceList) {
-		list = hackrf_device_list();
+
+		if(!list) {
+			list = hackrf_device_list();
+		}
 
 		for (int i = 0; i < list->devicecount; i++) {
 			if (list->serial_numbers[i]) {

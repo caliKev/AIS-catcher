@@ -41,6 +41,10 @@ namespace AIS {
 			src.setParams(sample_rate, 96000);
 			physical >> convert >> src >> ROT;
 		}
+		else if(MA_DS) {
+			DS_MA.setRates(sample_rate, 96000);
+			physical >> convert >> DS_MA >> ROT;
+		}
 		else {
 			const std::vector<uint32_t> definedRates = { 96000, 192000, 288000, 384000, 576000, 768000, 1152000, 1536000, 2304000, 3072000, 6144000, 12288000 };
 
@@ -262,13 +266,21 @@ namespace AIS {
 
 		if (option == "FP_DS") {
 			fixedpointDS = Util::Parse::Switch(arg);
+			MA_DS = false;
 		}
 		else if (option == "SOXR") {
 			SOXR_DS = Util::Parse::Switch(arg);
 			SAMPLERATE_DS = false;
+			MA_DS = false;
 		}
 		else if (option == "SRC") {
 			SAMPLERATE_DS = Util::Parse::Switch(arg);
+			SOXR_DS = false;
+			MA_DS = false;
+		}
+		else if (option == "MA") {
+			MA_DS = Util::Parse::Switch(arg);
+			SAMPLERATE_DS = false;
 			SOXR_DS = false;
 		}
 		else if (option == "DROOP") {
@@ -288,6 +300,8 @@ namespace AIS {
 			return "soxr ON " + Model::Get();
 		else if (SAMPLERATE_DS)
 			return "src ON " + Model::Get();
+		else if (MA_DS)
+			return "MA ON " + Model::Get();
 
 		return "droop " + Util::Convert::toString(droop_compensation) + " fp_ds " + Util::Convert::toString(fixedpointDS) + " " + Model::Get();
 	}
@@ -457,6 +471,11 @@ namespace AIS {
 		CGF_a.setParams(512, 187);
 		CGF_b.setParams(512, 187);
 
+		if(CGF_wide) {
+			CGF_a.setWide(true);
+			CGF_b.setWide(true);
+		}
+
 		*C_a >> CGF_a >> FC_a >> S_a;
 		*C_b >> CGF_b >> FC_b >> S_b;
 
@@ -496,6 +515,9 @@ namespace AIS {
 		if (option == "PS_EMA") {
 			PS_EMA = Util::Parse::Switch(arg);
 		}
+		else if (option == "AFC_WIDE") {
+			CGF_wide = Util::Parse::Switch(arg);
+		}
 		else
 			ModelFrontend::Set(option, arg);
 
@@ -503,7 +525,7 @@ namespace AIS {
 	}
 
 	std::string ModelChallenger::Get() {
-		return "ps_ema " + Util::Convert::toString(PS_EMA) + " " + ModelFrontend::Get();
+		return "ps_ema " + Util::Convert::toString(PS_EMA) + " afc_wide " + Util::Convert::toString(CGF_wide) + " " + ModelFrontend::Get();
 	}
 
 	void ModelDiscriminator::buildModel(char CH1, char CH2, int sample_rate, bool timerOn, Device::Device* dev) {
