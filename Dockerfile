@@ -24,6 +24,7 @@ RUN apt-get upgrade -y
 RUN apt-get install librtlsdr0 libairspy0 libhackrf0 libairspyhf1 libzmq5 libsoxr0 libcurl4 libpq-dev postgresql postgresql-client -y
 
 COPY --from=build /usr/local/bin/AIS-catcher /usr/local/bin/AIS-catcher
+COPY --from=build /root/AIS-catcher /root/AIS-catcherr
 
 ENTRYPOINT ["/usr/local/bin/AIS-catcher"]
 
